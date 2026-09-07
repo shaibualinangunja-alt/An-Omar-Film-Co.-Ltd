@@ -121,11 +121,23 @@ async function runSmokeTest() {
     useHardwareAcceleration: false,
   };
 
+  const ffmpegExe = [
+    path.resolve('src-tauri/binaries/ffmpeg.exe'),
+    path.resolve('src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe'),
+    'ffmpeg'
+  ].find(p => fs.existsSync(p)) || 'ffmpeg';
+
+  const ffprobeExe = [
+    path.resolve('src-tauri/binaries/ffprobe.exe'),
+    path.resolve('src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe'),
+    'ffprobe'
+  ].find(p => fs.existsSync(p)) || 'ffprobe';
+
   const args = FFmpegService.generateFFmpegArgs(reloadedProject, settings);
-  console.log(' -> FFmpeg command:', 'ffmpeg', args.slice(0, 8).join(' '), '...');
+  console.log(' -> FFmpeg command:', ffmpegExe, args.slice(0, 8).join(' '), '...');
 
   await new Promise<void>((resolve, reject) => {
-    execFile('ffmpeg', args, (err, stdout, stderr) => {
+    execFile(ffmpegExe, args, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(`FFmpeg export failed: ${err.message}\nStderr: ${stderr}`));
       }
@@ -143,7 +155,7 @@ async function runSmokeTest() {
   console.log('Step 10: Verify Exported Media with FFprobe...');
   const probeArgs = ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', exportPath];
   const probeOutput = await new Promise<string>((resolve, reject) => {
-    execFile('ffprobe', probeArgs, (err, stdout) => {
+    execFile(ffprobeExe, probeArgs, (err, stdout) => {
       if (err) return reject(err);
       resolve(stdout);
     });
