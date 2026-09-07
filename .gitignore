@@ -6,3 +6,4 @@ src-tauri/binaries/*.exe
 test-media/exports
 test-media/processed
 Abdul Usanga/
+release/installer/
