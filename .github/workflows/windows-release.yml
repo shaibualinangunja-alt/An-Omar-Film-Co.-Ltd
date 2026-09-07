@@ -57,7 +57,7 @@ jobs:
             Copy-Item $foundFfmpeg.FullName (Join-Path $binDir "ffmpeg.exe") -Force
             Copy-Item $foundFfprobe.FullName (Join-Path $binDir "ffprobe.exe") -Force
           }
-          Write-Host "Sidecars verified in $binDir:"
+          Write-Host "Sidecars verified in ${binDir}:"
           Get-ChildItem $binDir
 
       - name: Verify Security & Production Builds
