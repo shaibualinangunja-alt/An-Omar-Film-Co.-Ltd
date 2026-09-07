@@ -1,0 +1,11 @@
+# FreeCut Warm Golden Hour 3D LUT
+TITLE "FreeCut_Warm_Cinematic"
+LUT_3D_SIZE 2
+0.0 0.0 0.0
+1.0 0.1 0.0
+0.0 1.0 0.0
+1.0 1.0 0.1
+0.0 0.0 0.9
+1.0 0.0 0.8
+0.0 1.0 0.9
+1.0 1.0 0.9

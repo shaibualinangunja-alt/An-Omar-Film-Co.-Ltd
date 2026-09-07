@@ -1,0 +1,8 @@
+node_modules
+dist
+temp-thumbs
+src-tauri/target
+src-tauri/binaries/*.exe
+test-media/exports
+test-media/processed
+Abdul Usanga/

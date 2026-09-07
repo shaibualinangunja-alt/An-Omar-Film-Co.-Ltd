@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg-darkest: #090b0e;
+  --bg-darker: #0e1116;
+  --bg-panel: #141820;
+  --bg-elevated: #1a202c;
+  --border-subtle: #202736;
+  --border-light: #2e384d;
+  --accent-cyan: #00e5ff;
+  --accent-gold: #f59e0b;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-darkest);
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+/* Sleek custom scrollbars for NLE UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0e1116;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #252c3d;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #39445e;
+}
+
+/* Timeline ruler canvas and markers */
+.timeline-grid {
+  background-size: 100px 100%;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+/* Subtle glow effects */
+.glow-accent {
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+}
+
+.glow-gold {
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}

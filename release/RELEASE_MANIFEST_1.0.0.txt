@@ -1,0 +1,48 @@
+FREECUT 1.0.0
+FREECUT by ROMALABS
+
+Release status:
+FINAL
+
+Version:
+1.0.0
+
+Architecture:
+x86_64-pc-windows-msvc (Windows 64-bit)
+
+Build date:
+2026-09-08
+
+Artifacts:
+- README.txt (Release overview)
+- RELEASE_NOTES_1.0.0.md (Release highlights and notes)
+- THIRD_PARTY_NOTICES.md (Open source licenses and attribution)
+- SHA256SUMS.txt (Cryptographic integrity checksums)
+- src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe (Gyan.dev FFmpeg v8.1.1 sidecar, 96.76 MB)
+- src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe (Gyan.dev FFprobe v8.1.1 sidecar, 96.56 MB)
+- Windows Installer (.msi) & executable generated via CI/CD (.github/workflows/windows-release.yml)
+
+SHA-256:
+9d0a9242c8599b7b337e67604204fb6f0530bf8bd95d6933f1723015191e8c60  README.txt
+da833b8e6f792387f3db973c08c42a1c737911ad6d72de1da2255f934d696c75  RELEASE_NOTES_1.0.0.md
+9d7afbdf78fe8432ce270d7cd1f21f16d81ad8642cbadae9460de1e90f440d5f  THIRD_PARTY_NOTICES.md
+24806a3f987d0e6c4c319e306bcda300e190875de1f00f48dff4558fbfcff65e  ffmpeg-x86_64-pc-windows-msvc.exe
+dfce2109fd96df3ef7ffbcb26fcd4753556fe170eb6252c327850d51ca5ccff5  ffprobe-x86_64-pc-windows-msvc.exe
+
+Regression:
+340/340 PASS (100%)
+
+Real exports:
+10/10 PASS (100% verified with FFprobe)
+
+P0:
+0
+
+P1:
+0
+
+P2:
+1 (Windows Sandbox automated smoke test)
+
+Final decision:
+RELEASE APPROVED

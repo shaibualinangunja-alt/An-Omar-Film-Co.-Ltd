@@ -1,0 +1,77 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "FreeCut",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": false,
+        "copyFile": false,
+        "createDir": false,
+        "removeDir": false,
+        "removeFile": false,
+        "renameFile": false,
+        "exists": true,
+        "scope": ["$APPDATA/*", "$DOWNLOAD/*", "$DESKTOP/*", "$DOCUMENT/*", "**"]
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": true
+      },
+      "protocol": {
+        "all": false,
+        "asset": true,
+        "assetScope": ["**"]
+      },
+      "shell": {
+        "all": false,
+        "open": false,
+        "execute": false,
+        "sidecar": false
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.freecut.editor",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.ico"
+      ],
+      "externalBin": [
+        "binaries/ffmpeg",
+        "binaries/ffprobe"
+      ]
+    },
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' asset: https://asset.localhost blob: data:; media-src 'self' asset: https://asset.localhost blob: data:; connect-src 'self' ipc: tauri: https://asset.localhost asset: blob: data:; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none';"
+    },
+    "windows": [
+      {
+        "title": "FreeCut — Professional Editing. Zero Barriers.",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ]
+  }
+}
