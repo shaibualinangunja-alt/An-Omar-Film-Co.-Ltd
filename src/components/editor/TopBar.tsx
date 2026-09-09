@@ -89,7 +89,7 @@ export const TopBar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="font-extrabold tracking-wider text-base text-white">FREECUT</span>
               <span className="text-[10px] text-gray-400 font-medium tracking-normal">by ROMALABS</span>
-              <span className="text-[9px] bg-cyan-950/80 text-cyan-400 font-semibold px-1.5 py-0.5 rounded border border-cyan-800/60">ALPHA 0.8</span>
+              <span className="text-[9px] bg-cyan-950/80 text-cyan-300 font-semibold px-1.5 py-0.5 rounded border border-cyan-700/60">1.0.0</span>
             </div>
             <p className="text-[10px] text-gray-400 hidden md:block tracking-tight font-medium">Professional Editing. Zero Barriers.</p>
           </div>

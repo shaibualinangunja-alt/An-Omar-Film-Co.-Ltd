@@ -23,86 +23,255 @@ export class QuickLooksRegistry {
       grade: {},
     },
     {
+      id: 'natural',
+      name: 'Natural Enhancement',
+      description: 'Faithful skin tones with gentle contrast and subtle shadow recovery.',
+      previewColor: '#10b981',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.04,
+          saturation: 1.03,
+          highlights: -0.04,
+          shadows: 0.04,
+          whites: 0.02,
+          blacks: -0.01,
+        },
+      },
+    },
+    {
       id: 'clean',
-      name: 'FreeCut Clean',
-      description: 'Clean commercial look with crisp neutral contrast and slight highlight clarity.',
+      name: 'Clean Commercial',
+      description: 'Crisp midtones and neutral clean clarity without highlight harshness.',
       previewColor: '#0ea5e9',
       grade: {
         basic: {
           ...DEFAULT_COLOR_GRADE.basic,
-          contrast: 1.08,
-          saturation: 1.05,
+          contrast: 1.06,
+          saturation: 1.04,
           highlights: -0.05,
-          shadows: 0.05,
-          whites: 0.04,
+          shadows: 0.03,
+          whites: 0.03,
           blacks: -0.02,
         },
       },
     },
     {
-      id: 'cinematic',
-      name: 'Cinematic Teal & Gold',
-      description: 'Modern widescreen aesthetic with rich warm skin highlights and deep cyan shadows.',
-      previewColor: '#0d9488',
+      id: 'cinematic_warm',
+      name: 'Cinematic Warm',
+      description: 'Gentle warm push in highlights with rich contrast and protected skin tones.',
+      previewColor: '#f97316',
       grade: {
         basic: {
           ...DEFAULT_COLOR_GRADE.basic,
-          contrast: 1.15,
-          saturation: 1.08,
-          temperature: 8,
-          highlights: -0.1,
-          shadows: -0.05,
+          contrast: 1.08,
+          temperature: 10,
+          saturation: 1.04,
+          highlights: -0.06,
+          shadows: 0.02,
         },
         wheels: {
-          lift: { r: -0.04, g: 0.02, b: 0.06, y: -0.02 }, // Teal/cyan shadows
-          gamma: { r: 0.02, g: 0.01, b: -0.02, y: 0 },
-          gain: { r: 0.08, g: 0.04, b: -0.04, y: 0.02 },  // Warm golden highlights
+          lift: { r: 0.01, g: 0.0, b: -0.01, y: 0 },
+          gamma: { r: 0.02, g: 0.01, b: -0.01, y: 0 },
+          gain: { r: 0.04, g: 0.02, b: -0.02, y: 0.01 },
           offset: { r: 0, g: 0, b: 0, y: 0 },
         },
       },
     },
     {
-      id: 'warm',
-      name: 'Golden Hour Warmth',
-      description: 'Radiant sunset glow with rich amber warmth and softened contrast.',
-      previewColor: '#f59e0b',
-      grade: {
-        basic: {
-          ...DEFAULT_COLOR_GRADE.basic,
-          contrast: 1.04,
-          temperature: 24,
-          tint: 6,
-          saturation: 1.12,
-          highlights: 0.08,
-        },
-        wheels: {
-          lift: { r: 0.02, g: 0.01, b: -0.02, y: 0 },
-          gamma: { r: 0.04, g: 0.02, b: -0.03, y: 0 },
-          gain: { r: 0.06, g: 0.03, b: -0.04, y: 0 },
-          offset: { r: 0, g: 0, b: 0, y: 0 },
-        },
-      },
-    },
-    {
-      id: 'cool',
-      name: 'Nordic Cool',
-      description: 'Desaturated mood with crisp arctic blues and controlled midtones.',
+      id: 'cinematic_cool',
+      name: 'Cinematic Cool',
+      description: 'Controlled cool shadows with preserved skin luminescence and deep film blacks.',
       previewColor: '#38bdf8',
       grade: {
         basic: {
           ...DEFAULT_COLOR_GRADE.basic,
-          contrast: 1.06,
-          temperature: -22,
-          tint: -4,
-          saturation: 0.88,
-          shadows: 0.04,
+          contrast: 1.07,
+          temperature: -12,
+          saturation: 0.96,
+          highlights: -0.04,
+          shadows: 0.03,
         },
         wheels: {
-          lift: { r: -0.03, g: 0.01, b: 0.05, y: 0 },
-          gamma: { r: -0.02, g: 0.0, b: 0.04, y: 0 },
-          gain: { r: -0.01, g: 0.0, b: 0.02, y: 0 },
+          lift: { r: -0.02, g: 0.0, b: 0.03, y: 0 },
+          gamma: { r: -0.01, g: 0.0, b: 0.01, y: 0 },
+          gain: { r: 0.01, g: 0.01, b: -0.01, y: 0 },
           offset: { r: 0, g: 0, b: 0, y: 0 },
         },
+      },
+    },
+    {
+      id: 'soft_film',
+      name: 'Soft Film',
+      description: 'Gentle highlight roll-off and softly lifted blacks with organic tonal response.',
+      previewColor: '#a855f7',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 0.98,
+          saturation: 0.96,
+          highlights: -0.10,
+          shadows: 0.06,
+          blacks: 0.03,
+        },
+      },
+    },
+    {
+      id: 'moody_cinema',
+      name: 'Moody Cinema',
+      description: 'Atmospheric deep tones with protected skin details and rich shadow contrast.',
+      previewColor: '#6366f1',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.10,
+          brightness: -0.03,
+          saturation: 0.94,
+          highlights: -0.08,
+          shadows: -0.04,
+        },
+        wheels: {
+          lift: { r: -0.02, g: -0.01, b: 0.02, y: -0.01 },
+          gamma: { r: 0.01, g: 0.0, b: -0.01, y: 0 },
+          gain: { r: 0.02, g: 0.01, b: -0.01, y: 0 },
+          offset: { r: 0, g: 0, b: 0, y: 0 },
+        },
+      },
+    },
+    {
+      id: 'golden_hour',
+      name: 'Golden Hour',
+      description: 'Radiant amber sunset glow with soft highlight bloom and warm ambiance.',
+      previewColor: '#eab308',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.05,
+          temperature: 16,
+          tint: 4,
+          saturation: 1.06,
+          highlights: 0.02,
+          shadows: 0.02,
+        },
+        wheels: {
+          lift: { r: 0.02, g: 0.01, b: -0.02, y: 0 },
+          gamma: { r: 0.03, g: 0.015, b: -0.02, y: 0 },
+          gain: { r: 0.05, g: 0.025, b: -0.03, y: 0.01 },
+          offset: { r: 0, g: 0, b: 0, y: 0 },
+        },
+      },
+    },
+    {
+      id: 'night_cinema',
+      name: 'Night Cinema',
+      description: 'Deep nocturnal blue shadow tones with crisp tungsten highlights.',
+      previewColor: '#1e3a8a',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.08,
+          brightness: -0.04,
+          temperature: -16,
+          saturation: 0.92,
+          highlights: -0.06,
+          shadows: 0.02,
+        },
+        wheels: {
+          lift: { r: -0.03, g: -0.01, b: 0.04, y: 0 },
+          gamma: { r: -0.01, g: 0.0, b: 0.02, y: 0 },
+          gain: { r: 0.03, g: 0.02, b: -0.01, y: 0 },
+          offset: { r: 0, g: 0, b: 0, y: 0 },
+        },
+      },
+    },
+    {
+      id: 'documentary',
+      name: 'Documentary',
+      description: 'Real-world dynamic range with subtle highlight recovery and lifelike skin tones.',
+      previewColor: '#84cc16',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.02,
+          saturation: 1.01,
+          highlights: -0.06,
+          shadows: 0.04,
+          whites: 0.01,
+          blacks: 0.01,
+        },
+      },
+    },
+    {
+      id: 'teal_orange',
+      name: 'Teal & Orange (Controlled)',
+      description: 'Harmonious Hollywood split-toning with strict skin protection and gentle cyan shadows.',
+      previewColor: '#06b6d4',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 1.09,
+          temperature: 6,
+          saturation: 1.04,
+          highlights: -0.06,
+          shadows: -0.02,
+        },
+        wheels: {
+          lift: { r: -0.03, g: 0.01, b: 0.04, y: -0.01 }, // Subtle cyan/teal
+          gamma: { r: 0.01, g: 0.0, b: -0.01, y: 0 },
+          gain: { r: 0.04, g: 0.02, b: -0.03, y: 0.01 },  // Controlled warm amber
+          offset: { r: 0, g: 0, b: 0, y: 0 },
+        },
+      },
+    },
+    {
+      id: 'vintage_film',
+      name: 'Vintage Film (Controlled)',
+      description: 'Nostalgic analog film response with softened contrast and creamy highlights.',
+      previewColor: '#d97706',
+      grade: {
+        basic: {
+          ...DEFAULT_COLOR_GRADE.basic,
+          contrast: 0.98,
+          temperature: 8,
+          saturation: 0.94,
+          highlights: -0.08,
+          shadows: 0.05,
+          blacks: 0.03,
+        },
+        wheels: {
+          lift: { r: 0.02, g: 0.01, b: -0.01, y: 0.01 },
+          gamma: { r: 0.01, g: 0.01, b: -0.01, y: 0 },
+          gain: { r: 0.03, g: 0.02, b: -0.02, y: 0 },
+          offset: { r: 0, g: 0, b: 0, y: 0 },
+        },
+      },
+    },
+    // Aliases for backward compatibility
+    {
+      id: 'cinematic',
+      name: 'Cinematic (Legacy)',
+      description: 'Legacy cinematic look.',
+      previewColor: '#0d9488',
+      grade: {
+        basic: { ...DEFAULT_COLOR_GRADE.basic, contrast: 1.08, saturation: 1.04 },
+      },
+    },
+    {
+      id: 'warm',
+      name: 'Warm (Legacy)',
+      description: 'Legacy warm look.',
+      previewColor: '#f59e0b',
+      grade: {
+        basic: { ...DEFAULT_COLOR_GRADE.basic, temperature: 14, saturation: 1.05 },
+      },
+    },
+    {
+      id: 'cool',
+      name: 'Cool (Legacy)',
+      description: 'Legacy cool look.',
+      previewColor: '#38bdf8',
+      grade: {
+        basic: { ...DEFAULT_COLOR_GRADE.basic, temperature: -14, saturation: 0.95 },
       },
     },
     {
@@ -250,3 +419,7 @@ export class QuickLooksRegistry {
     };
   }
 }
+
+export const QUICK_LOOK_PRESETS = QuickLooksRegistry.listLooks();
+export const getQuickLookPreset = (id: QuickLookId) => QuickLooksRegistry.getLook(id);
+

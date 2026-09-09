@@ -96,6 +96,7 @@ jobs:
           npx tsx test-alpha10-step2-bridge.ts
           npx tsx test-playback-engine.ts
           npx tsx test-smoke-alpha10.ts
+          npx tsx test-product-improvements.ts
 
       - name: Build Windows Tauri Application & Installer (.msi)
         run: npx --yes @tauri-apps/cli@1.5.14 build

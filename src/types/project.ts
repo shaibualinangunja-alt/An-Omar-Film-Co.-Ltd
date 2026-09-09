@@ -3,7 +3,7 @@
  * Follows the non-destructive data-driven NLE project model.
  */
 
-export type MediaType = 'video' | 'audio' | 'image' | 'text';
+export type MediaType = 'video' | 'audio' | 'image' | 'text' | 'overlay';
 
 export interface MediaAsset {
   id: string;
@@ -18,6 +18,7 @@ export interface MediaAsset {
   codec?: string;
   audioChannels?: number;
   sampleRate?: number;
+  hasAudio?: boolean;
   thumbnailUrl?: string;
   isMissing?: boolean;
   createdAt: number;
@@ -48,6 +49,7 @@ export interface ClipItem {
   fadeInDuration?: number; // audio fade in (seconds)
   fadeOutDuration?: number;// audio fade out (seconds)
   aiAudioCleanup?: any;    // alpha 0.9 audio cleanup settings
+  audioEffects?: import('../audio/types').ClipAudioEffects; // Full Audio Suite effects
   name: string;
   color?: string;
   animations?: import('../animation/types').ClipAnimations;
@@ -61,6 +63,11 @@ export interface ClipItem {
   trackingData?: import('../compositing/types').TrackingData[];
   colorGrade?: import('../color/types').ColorGradeSettings;
   colorManagement?: import('../color/types').ColorManagementSettings;
+  linkedClipId?: string; // Linked video/audio clip ID for synchronized editing
+  isOverlay?: boolean; // True if clip represents a procedural overlay layer
+  overlayId?: string; // Procedural overlay preset identifier
+  overlayPresetId?: string; // Alias for overlayId
+  overlayIntensity?: number; // 0.0 to 2.0 (1.0 = default)
 }
 
 export type TrackType = 'video' | 'audio';

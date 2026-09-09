@@ -17,7 +17,7 @@ import { evaluateClipAnimations } from '../../animation';
 
 import { TransitionRegistry, findActiveTransitionAtTime } from '../../transitions';
 import { TextRenderer } from '../../text';
-import { CompositingPipeline } from '../../compositing';
+import { CompositingPipeline, getOverlayPreset, getCanvasCompositeOperation } from '../../compositing';
 import { AudioMeter } from './AudioMeter';
 import { ScopesPanel } from './ScopesPanel';
 
@@ -78,6 +78,19 @@ export const PreviewPanel: React.FC = () => {
     ctx.fillStyle = state.project.project.backgroundColor || '#000000';
     ctx.fillRect(0, 0, width, height);
 
+    // Source Media Preview Mode
+    if (state.previewMediaId) {
+      const media = state.project.media.find(m => m.id === state.previewMediaId);
+      if (media?.thumbnailUrl) {
+        const img = new Image();
+        img.src = media.thumbnailUrl;
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, width, height);
+        };
+      }
+      return;
+    }
+
     // 2. Find active clips at current playhead time
     const time = state.currentTime;
     const activeClips = state.project.clips.filter(
@@ -114,6 +127,21 @@ export const PreviewPanel: React.FC = () => {
         const animState = evaluateClipAnimations(clip, relativeTime);
         TextRenderer.renderText(targetCtx, clip.textConfig, animState, width, height);
         return true;
+      }
+
+      if (clip.type === 'overlay' || clip.overlayId) {
+        if (!isTrackVisible(clip.trackId)) return false;
+        const relativeTime = clipPlayheadTime - clip.startTime;
+        const animState = evaluateClipAnimations(clip, relativeTime);
+        const preset = getOverlayPreset(clip.overlayId || 'cinematic_film_grain');
+        if (preset) {
+          targetCtx.save();
+          targetCtx.globalCompositeOperation = getCanvasCompositeOperation(clip.blendMode || preset.defaultBlendMode);
+          targetCtx.globalAlpha = Math.max(0, Math.min(1, animState.opacity ?? clip.transform.opacity ?? preset.defaultOpacity));
+          preset.renderCanvas(targetCtx, width, height, relativeTime, clip.overlayIntensity ?? 1.0);
+          targetCtx.restore();
+          return true;
+        }
       }
 
       const media = state.project.media.find(m => m.id === clip.mediaId);
@@ -456,6 +484,24 @@ export const PreviewPanel: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Source Media Preview Mode Banner */}
+      {state.previewMediaId && (
+        <div className="bg-cyan-950/90 border-b border-cyan-700/60 px-3 py-1.5 flex items-center justify-between text-xs z-20">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span className="font-semibold text-cyan-200">
+              Source Preview: {state.project.media.find(m => m.id === state.previewMediaId)?.name || 'Media Asset'}
+            </span>
+          </div>
+          <button
+            onClick={() => store.setState({ previewMediaId: null })}
+            className="text-[11px] bg-cyan-800/80 hover:bg-cyan-700 text-cyan-100 px-2 py-0.5 rounded font-medium transition cursor-pointer"
+          >
+            Close Preview (Return to Timeline)
+          </button>
+        </div>
+      )}
 
       {/* Main Canvas Viewport */}
       <div

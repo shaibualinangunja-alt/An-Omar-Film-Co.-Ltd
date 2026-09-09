@@ -29,21 +29,37 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = ({
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('application/freecut-media-id', media.id);
+    e.dataTransfer.setData('application/freecut-media-type', media.type);
     e.dataTransfer.effectAllowed = 'copy';
+    projectStore.setState({ draggedMedia: media });
   };
+
+  const handleDragEnd = () => {
+    projectStore.setState({ draggedMedia: null });
+  };
+
+  const handleDoubleClick = () => {
+    projectStore.setState({ previewMediaId: media.id });
+  };
+
+  const [imgError, setImgError] = React.useState(false);
 
   return (
     <div
       draggable
       onDragStart={handleDragStart}
-      className="group relative bg-freecut-panel border border-freecut-border hover:border-cyan-500/60 rounded-md overflow-hidden transition-all duration-150 flex flex-col cursor-grab active:cursor-grabbing select-none"
+      onDragEnd={handleDragEnd}
+      onDoubleClick={handleDoubleClick}
+      title="Double-click to preview • Drag to timeline"
+      className="group relative bg-freecut-panel border border-freecut-border hover:border-cyan-500/70 hover:shadow-lg hover:shadow-cyan-950/20 rounded-md overflow-hidden transition-all duration-150 flex flex-col cursor-grab active:cursor-grabbing select-none"
     >
       {/* Thumbnail Container */}
       <div className="relative aspect-video bg-black/60 flex items-center justify-center overflow-hidden">
-        {media.thumbnailUrl ? (
+        {media.thumbnailUrl && !imgError ? (
           <img
             src={media.thumbnailUrl}
             alt={media.name}
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
           />
         ) : (

@@ -196,13 +196,47 @@ export class TimelineOperations {
 
     shiftedClips.push(newClip);
 
+    const affectedIds = [newClip.id];
+    const isVideoWithAudio = media.type === 'video' && (!!media.hasAudio || (media.audioChannels ?? 0) > 0);
+    if (isVideoWithAudio) {
+      newClip.muted = true;
+      (newClip as any).audioEnabled = false;
+      const audioTrack = project.tracks.find(t => t.type === 'audio' && !t.locked) || { id: 'track_a1' };
+      const audioClipId = this.generateClipId();
+      const audioClip: ClipItem = {
+        id: audioClipId,
+        mediaId,
+        trackId: audioTrack.id,
+        startTime: targetStartTime,
+        duration,
+        sourceStart: 0,
+        sourceDuration: duration,
+        type: 'audio',
+        name: `${media.name} (Audio)`,
+        transform: {
+          positionX: 0,
+          positionY: 0,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+        },
+        volume: 1.0,
+        muted: false,
+        audioEnabled: true,
+        linkedClipId: newClip.id,
+      };
+      newClip.linkedClipId = audioClipId;
+      shiftedClips.push(audioClip);
+      affectedIds.push(audioClipId);
+    }
+
     return {
       project: {
         ...project,
         clips: shiftedClips,
         updatedAt: Date.now(),
       },
-      affectedClipIds: [newClip.id],
+      affectedClipIds: affectedIds,
     };
   }
 

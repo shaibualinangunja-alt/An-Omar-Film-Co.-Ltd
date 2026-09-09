@@ -72,6 +72,7 @@ export class MediaService {
         codec: videoStream?.codec_name || audioStream?.codec_name,
         audioChannels: audioStream?.channels,
         sampleRate: audioStream?.sample_rate ? parseInt(audioStream.sample_rate, 10) : undefined,
+        hasAudio: !!audioStream,
         thumbnailUrl,
         createdAt: Date.now(),
       };
@@ -183,28 +184,46 @@ export class MediaService {
   private static probeVideo(url: string): Promise<{ duration: number; width: number; height: number; thumbnailUrl: string }> {
     return new Promise((resolve) => {
       const video = document.createElement('video');
-      video.preload = 'metadata';
+      video.preload = 'auto';
       video.muted = true;
       video.playsInline = true;
+      video.crossOrigin = 'anonymous';
 
-      video.onloadedmetadata = () => {
-        const duration = video.duration || 5;
-        video.currentTime = Math.min(0.5, duration / 2);
+      let resolved = false;
+      const finish = (result: { duration: number; width: number; height: number; thumbnailUrl: string }) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(result);
+        }
       };
 
-      video.onseeked = () => {
+      const timer = setTimeout(() => {
+        finish({
+          duration: video.duration || 5,
+          width: video.videoWidth || 1920,
+          height: video.videoHeight || 1080,
+          thumbnailUrl: ''
+        });
+      }, 3500);
+
+      const captureFrame = () => {
         try {
+          const w = video.videoWidth || 320;
+          const h = video.videoHeight || 180;
           const canvas = document.createElement('canvas');
-          canvas.width = 160;
-          canvas.height = 90;
+          const targetW = 320;
+          const targetH = Math.round((h / w) * targetW) || 180;
+          canvas.width = targetW;
+          canvas.height = targetH;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
-            resolve({
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.85);
+            clearTimeout(timer);
+            finish({
               duration: video.duration || 5,
-              width: video.videoWidth || 1920,
-              height: video.videoHeight || 1080,
+              width: w,
+              height: h,
               thumbnailUrl
             });
             return;
@@ -212,7 +231,8 @@ export class MediaService {
         } catch (e) {
           console.warn('Could not generate canvas thumbnail:', e);
         }
-        resolve({
+        clearTimeout(timer);
+        finish({
           duration: video.duration || 5,
           width: video.videoWidth || 1920,
           height: video.videoHeight || 1080,
@@ -220,8 +240,23 @@ export class MediaService {
         });
       };
 
+      video.onloadeddata = () => {
+        const duration = video.duration || 5;
+        const targetTime = Math.min(0.5, duration / 2);
+        if (Math.abs(video.currentTime - targetTime) < 0.05) {
+          captureFrame();
+        } else {
+          video.currentTime = targetTime;
+        }
+      };
+
+      video.onseeked = () => {
+        captureFrame();
+      };
+
       video.onerror = () => {
-        resolve({ duration: 5, width: 1920, height: 1080, thumbnailUrl: '' });
+        clearTimeout(timer);
+        finish({ duration: 5, width: 1920, height: 1080, thumbnailUrl: '' });
       };
 
       video.src = url;

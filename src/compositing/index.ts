@@ -9,3 +9,4 @@ export * from './chromaKey';
 export * from './maskRenderer';
 export * from './pipeline';
 export * from './trackingService';
+export * from './overlayAssets';

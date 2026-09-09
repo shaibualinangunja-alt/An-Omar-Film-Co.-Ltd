@@ -316,7 +316,13 @@ export class DesktopBridge {
       try {
         const tauri = (window as unknown as { __TAURI__?: { invoke: (cmd: string, args: unknown) => Promise<string> } }).__TAURI__;
         if (tauri) {
-          return await tauri.invoke('generate_thumbnail', { videoPath, timeSeconds });
+          const res = await tauri.invoke('generate_thumbnail', { videoPath, timeSeconds });
+          if (res) {
+            if (res.startsWith('data:') || res.startsWith('blob:')) {
+              return res;
+            }
+            return this.getMediaStreamUrl(res);
+          }
         }
       } catch (err) {
         console.warn('Tauri generate_thumbnail failed, trying dev bridge:', err);
@@ -344,7 +350,13 @@ export class DesktopBridge {
           return new Promise<string>((resolve, reject) => {
             execFile(ffmpegBin, ['-y', '-ss', Number(timeSeconds).toFixed(3), '-i', videoPath, '-vframes', '1', '-q:v', '2', outFilePath], (err) => {
               if (err) return reject(err);
-              resolve(outFilePath);
+              try {
+                const imgBuf = fs.readFileSync(outFilePath);
+                const dataUrl = `data:image/jpeg;base64,${imgBuf.toString('base64')}`;
+                resolve(dataUrl);
+              } catch (readErr) {
+                resolve(outFilePath);
+              }
             });
           });
         }

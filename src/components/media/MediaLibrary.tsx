@@ -76,10 +76,34 @@ export const MediaLibrary: React.FC = () => {
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       setIsImporting(true);
       try {
+        const supportedExts = new Set(['mp4', 'mov', 'webm', 'avi', 'mkv', 'mp3', 'wav', 'aac', 'ogg', 'jpg', 'jpeg', 'png', 'webp']);
+        let importedCount = 0;
+        let rejectedCount = 0;
+
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           const file = e.dataTransfer.files[i];
-          const asset = await MediaService.probeMediaFile(file);
-          store.addMedia(asset);
+          const ext = file.name.split('.').pop()?.toLowerCase() || '';
+          if (supportedExts.has(ext)) {
+            try {
+              const asset = await MediaService.probeMediaFile(file);
+              store.addMedia(asset);
+              importedCount++;
+            } catch (err) {
+              console.error(`Failed to probe ${file.name}:`, err);
+            }
+          } else {
+            rejectedCount++;
+          }
+        }
+
+        if (rejectedCount > 0) {
+          store.setState({
+            statusMessage: `Imported ${importedCount} file(s). Skipped ${rejectedCount} unsupported file(s).`,
+          });
+        } else if (importedCount > 0) {
+          store.setState({
+            statusMessage: `Successfully imported ${importedCount} media file(s)`,
+          });
         }
       } catch (err) {
         console.error('Drop import error:', err);
@@ -202,10 +226,17 @@ export const MediaLibrary: React.FC = () => {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex-1 p-3 overflow-y-auto ${
-          isDraggingOver ? 'bg-cyan-950/20 border-2 border-dashed border-cyan-400' : ''
-        }`}
+        className="flex-1 p-3 overflow-y-auto relative"
       >
+        {/* Active Explorer Drag-over Dropzone Overlay */}
+        {isDraggingOver && (
+          <div className="absolute inset-2 z-30 bg-cyan-950/90 border-2 border-dashed border-cyan-400 rounded-lg flex flex-col items-center justify-center pointer-events-none shadow-2xl backdrop-blur-sm">
+            <Upload className="w-10 h-10 text-cyan-400 mb-2 animate-bounce" />
+            <span className="text-sm font-bold text-cyan-200">Drop Files to Import</span>
+            <span className="text-xs text-cyan-400/80 mt-1">Video • Audio • Images</span>
+          </div>
+        )}
+
         {filteredMedia.length > 0 ? (
           <div className="grid grid-cols-2 gap-2.5">
             {filteredMedia.map(media => (
@@ -220,15 +251,26 @@ export const MediaLibrary: React.FC = () => {
         ) : (
           <div
             onClick={handleImportFiles}
-            className="h-full min-h-[220px] flex flex-col items-center justify-center border-2 border-dashed border-freecut-border/80 hover:border-cyan-500/50 rounded-lg p-6 text-center cursor-pointer transition-colors group"
+            className="h-full min-h-[240px] flex flex-col items-center justify-center border-2 border-dashed border-freecut-border/80 hover:border-cyan-500/60 rounded-lg p-6 text-center cursor-pointer transition-all group bg-freecut-panel/20 hover:bg-freecut-panel/40"
           >
-            <div className="w-12 h-12 rounded-full bg-freecut-panel flex items-center justify-center text-gray-400 group-hover:text-cyan-400 transition-colors mb-3">
-              <FolderDown className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-full bg-freecut-panel border border-freecut-border flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:border-cyan-400/50 transition-all mb-3 shadow-lg">
+              <FolderDown className="w-7 h-7" />
             </div>
-            <p className="text-xs font-semibold text-gray-200 mb-1">Drag & Drop Media Here</p>
-            <p className="text-[11px] text-gray-400 max-w-[200px]">
-              or click to browse MP4, MOV, WebM, AVI, MKV files
+            <h3 className="text-sm font-bold text-gray-200 mb-1">Drag & Drop Media Here</h3>
+            <p className="text-xs text-gray-400 max-w-[220px] mb-3">
+              Drag videos, photos or audio directly into this panel
             </p>
+            <span className="text-[11px] text-gray-500 mb-3">— or —</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleImportFiles();
+              }}
+              className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded text-xs shadow-md transition-all active:scale-95 flex items-center space-x-1.5"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import Media</span>
+            </button>
           </div>
         )}
       </div>

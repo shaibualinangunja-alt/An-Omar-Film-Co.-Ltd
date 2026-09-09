@@ -1,10 +1,10 @@
 import { FreeCutProject } from '../types/project';
 import { ExportSettings } from '../types/export';
-import { compileEffectsToFFmpeg } from '../effects';
+import { compileEffectsToFFmpeg, compileMotionTransformToFFmpeg } from '../effects';
 import { TransitionRegistry } from '../transitions';
 import { compileTextToFFmpegDrawtext, TextStyle } from '../text';
 import { DEFAULT_CAPTION_STYLE } from '../captions';
-import { compileChromaKeyToFFmpeg, compileMaskToFFmpeg, getFFmpegBlendMode } from '../compositing';
+import { compileChromaKeyToFFmpeg, compileMaskToFFmpeg, getFFmpegBlendMode, getOverlayPreset } from '../compositing';
 import { ColorCompiler } from '../color/colorCompiler';
 import { AudioMixer } from '../audio/audioMixer';
 import { HardwareDetector } from '../export/hardwareDetection';
@@ -70,7 +70,7 @@ export class FFmpegService {
 
     // 2. Process Video Clips
     const videoClips = project.clips
-      .filter(c => c.type === 'video' || c.type === 'image')
+      .filter(c => (c.type === 'video' || c.type === 'image') && !c.isOverlay && (c as any).type !== 'overlay')
       .sort((a, b) => a.startTime - b.startTime);
 
     let finalVideoStream: string | null = null;
@@ -119,6 +119,12 @@ export class FFmpegService {
           `pad=${settings.width}:${settings.height}:(ow-iw)/2:(oh-ih)/2`,
           `setsar=1`
         );
+
+        // Motion & Camera Transform Presets / Keyframes
+        const motionFilter = compileMotionTransformToFFmpeg(clip, settings.width, settings.height, settings.fps);
+        if (motionFilter) {
+          filters.push(motionFilter);
+        }
 
         // Masks
         if (clip.masks && clip.masks.length > 0) {
@@ -226,6 +232,35 @@ export class FFmpegService {
 
         finalVideoStream = `[${currentStream}]`;
       }
+    }
+
+    // 2a. Process Overlay Clips (Layers above base video)
+    const overlayClips = project.clips.filter(c => c.type === 'overlay' || c.isOverlay);
+    if (overlayClips.length > 0) {
+      if (!finalVideoStream) {
+        const overlayDuration = Math.max(5, ...overlayClips.map(c => c.startTime + c.duration));
+        filterParts.push(`color=c=black:s=${settings.width}x${settings.height}:r=${settings.fps}:d=${overlayDuration.toFixed(3)}[v_base]`);
+        finalVideoStream = '[v_base]';
+      }
+
+      let currentStream = finalVideoStream.replace(/[\[\]]/g, '');
+      overlayClips.forEach((ovClip, ovIdx) => {
+        const preset = getOverlayPreset(ovClip.overlayPresetId || (ovClip as any).overlayId || 'cinematic_film_grain');
+        if (!preset) return;
+
+        const ovRawStream = `v_ov_raw_${ovIdx}`;
+        const nextStream = `v_ov_out_${ovIdx}`;
+        filterParts.push(`${preset.getFFmpegFilter(settings.width, settings.height, ovClip.duration, settings.fps)}[${ovRawStream}]`);
+
+        const blendMode = getFFmpegBlendMode(ovClip.blendMode || preset.defaultBlendMode);
+        const opacity = (ovClip.transform?.opacity ?? preset.defaultOpacity).toFixed(2);
+        filterParts.push(
+          `[${currentStream}][${ovRawStream}]blend=all_mode=${blendMode}:all_opacity=${opacity}[${nextStream}]`
+        );
+        currentStream = nextStream;
+      });
+
+      finalVideoStream = `[${currentStream}]`;
     }
 
     // 2b. Process Text Clips and Captions (Burned into video stream)

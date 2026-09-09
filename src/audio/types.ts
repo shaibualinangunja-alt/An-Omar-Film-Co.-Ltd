@@ -63,3 +63,78 @@ export const DEFAULT_CLIP_AUDIO: ClipAudioSettings = {
   fadeInDuration: 0.0,
   fadeOutDuration: 0.0,
 };
+
+export interface AudioDenoiseSettings {
+  enabled: boolean;
+  amount: number; // 0 to 100%
+  highpass: boolean; // 80Hz rumble cut
+}
+
+export interface AudioVoiceSettings {
+  enabled: boolean;
+  clarity: number; // 0 to 100%
+  enhance: boolean; // presence + mild vocal compression
+}
+
+export interface AudioEqBand {
+  freq: number; // Hz
+  gain: number; // dB (-15 to +15)
+  q: number; // Q factor (0.5 to 4.0)
+}
+
+export interface AudioEqSettings {
+  enabled: boolean;
+  low: AudioEqBand;     // 80 Hz
+  lowMid: AudioEqBand;  // 300 Hz
+  mid: AudioEqBand;     // 1000 Hz
+  highMid: AudioEqBand; // 3500 Hz
+  high: AudioEqBand;    // 10000 Hz
+}
+
+export interface AudioReverbSettings {
+  enabled: boolean;
+  preset?: 'small_room' | 'room' | 'hall' | 'large_hall';
+  roomSize: number; // 0 to 100
+  decay: number;    // 0 to 100
+  wetDry: number;   // 0 to 100 (wet percentage)
+  preDelay: number; // ms 0 to 100
+}
+
+export interface AudioSeparationSettings {
+  mode: 'all' | 'vocals' | 'instrumental' | 'dialogue' | 'background';
+  status?: 'idle' | 'processing' | 'ready' | 'error';
+  progress?: number;
+}
+
+export interface ClipAudioEffects {
+  denoise?: AudioDenoiseSettings;
+  voice?: AudioVoiceSettings;
+  eq?: AudioEqSettings;
+  reverb?: AudioReverbSettings;
+  separation?: AudioSeparationSettings;
+}
+
+export const DEFAULT_CLIP_AUDIO_EFFECTS: ClipAudioEffects = {
+  denoise: { enabled: false, amount: 50, highpass: true },
+  voice: { enabled: false, clarity: 50, enhance: false },
+  eq: {
+    enabled: false,
+    low: { freq: 80, gain: 0, q: 1.0 },
+    lowMid: { freq: 300, gain: 0, q: 1.0 },
+    mid: { freq: 1000, gain: 0, q: 1.0 },
+    highMid: { freq: 3500, gain: 0, q: 1.0 },
+    high: { freq: 10000, gain: 0, q: 1.0 },
+  },
+  reverb: {
+    enabled: false,
+    preset: 'room',
+    roomSize: 40,
+    decay: 35,
+    wetDry: 25,
+    preDelay: 20,
+  },
+  separation: {
+    mode: 'all',
+    status: 'idle',
+  },
+};

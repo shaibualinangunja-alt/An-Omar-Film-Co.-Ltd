@@ -14,6 +14,56 @@ export interface CompiledAudioGraph {
 
 export class AudioMixer {
   /**
+   * Generates FFmpeg audio filter tokens for an individual clip's audio suite effects.
+   */
+  static generateAudioFilterChain(fx?: import('./types').ClipAudioEffects, volume: number = 1.0): string[] {
+    const filters: string[] = [];
+    if (Math.abs(volume - 1.0) > 0.01) {
+      filters.push(`volume=${volume.toFixed(2)}`);
+    }
+
+    // 1. Cleanup / Denoise
+    if (fx?.denoise?.enabled) {
+      const nrAmount = Math.max(1, Math.min(97, Math.round((fx.denoise.amount / 100) * 35)));
+      const noiseFloor = -50 + Math.round((fx.denoise.amount / 100) * 30);
+      filters.push(`afftdn=nr=${nrAmount}:nf=${noiseFloor}`);
+      if (fx.denoise.highpass) {
+        filters.push('highpass=f=80');
+      }
+    }
+
+    // 2. Voice Enhancement & Speech Clarity
+    if (fx?.voice?.enabled) {
+      const clarityGain = ((fx.voice.clarity / 100) * 6).toFixed(1);
+      filters.push('highpass=f=85', `equalizer=f=3200:width_type=q:w=1.2:g=${clarityGain}`);
+      if (fx.voice.enhance) {
+        filters.push('acompressor=threshold=-16dB:ratio=3:attack=15:release=200');
+      }
+    }
+
+    // 3. 5-Band Parametric EQ
+    if (fx?.eq?.enabled) {
+      const bands = [fx.eq.low, fx.eq.lowMid, fx.eq.mid, fx.eq.highMid, fx.eq.high];
+      for (const band of bands) {
+        if (band && Math.abs(band.gain) > 0.1) {
+          filters.push(`equalizer=f=${Math.round(band.freq)}:width_type=q:w=${band.q.toFixed(2)}:g=${band.gain.toFixed(1)}`);
+        }
+      }
+    }
+
+    // 4. Reverb
+    if (fx?.reverb?.enabled) {
+      const inGain = ((100 - fx.reverb.wetDry * 0.4) / 100).toFixed(2);
+      const outGain = (fx.reverb.wetDry / 120).toFixed(2);
+      const delay = Math.max(20, Math.min(250, Math.round(fx.reverb.roomSize * 1.8 + fx.reverb.preDelay)));
+      const decay = Math.max(0.1, Math.min(0.7, (fx.reverb.decay / 150))).toFixed(2);
+      filters.push(`aecho=${inGain}:${outGain}:${delay}:${decay}`);
+    }
+
+    return filters;
+  }
+
+  /**
    * Compiles the project's audio clips into an FFmpeg filter_complex sub-graph.
    */
   static compileAudioMix(
@@ -118,8 +168,49 @@ export class AudioMixer {
       let inAudioIdx = mediaInIdx;
       if (clip.aiAudioCleanup?.processedAudioPath && mediaMap.has(clip.aiAudioCleanup.processedAudioPath)) {
         inAudioIdx = mediaMap.get(clip.aiAudioCleanup.processedAudioPath)!;
+      }
+
+      // --- Professional Audio Processing Suite ---
+      const fx = clip.audioEffects;
+
+      // 1. Cleanup / Denoise
+      if (fx?.denoise?.enabled) {
+        const nrAmount = Math.max(1, Math.min(97, Math.round((fx.denoise.amount / 100) * 35))); // 1 to 35 dB reduction
+        const noiseFloor = -50 + Math.round((fx.denoise.amount / 100) * 30); // -50 to -20 dB
+        filters.push(`afftdn=nr=${nrAmount}:nf=${noiseFloor}`);
+        if (fx.denoise.highpass) {
+          filters.push('highpass=f=80');
+        }
       } else if (clip.aiAudioCleanup?.reduceNoise) {
         filters.push('afftdn=nr=12:nf=-25', 'highpass=f=80', 'lowpass=f=12000');
+      }
+
+      // 2. Voice Enhancement & Speech Clarity
+      if (fx?.voice?.enabled) {
+        const clarityGain = ((fx.voice.clarity / 100) * 6).toFixed(1); // 0 to +6dB boost
+        filters.push('highpass=f=85', `equalizer=f=3200:width_type=q:w=1.2:g=${clarityGain}`);
+        if (fx.voice.enhance) {
+          filters.push('acompressor=threshold=-16dB:ratio=3:attack=15:release=200');
+        }
+      }
+
+      // 3. 5-Band Parametric EQ
+      if (fx?.eq?.enabled) {
+        const bands = [fx.eq.low, fx.eq.lowMid, fx.eq.mid, fx.eq.highMid, fx.eq.high];
+        for (const band of bands) {
+          if (Math.abs(band.gain) > 0.1) {
+            filters.push(`equalizer=f=${Math.round(band.freq)}:width_type=q:w=${band.q.toFixed(2)}:g=${band.gain.toFixed(1)}`);
+          }
+        }
+      }
+
+      // 4. Reverb
+      if (fx?.reverb?.enabled) {
+        const inGain = ((100 - fx.reverb.wetDry * 0.4) / 100).toFixed(2);
+        const outGain = (fx.reverb.wetDry / 120).toFixed(2);
+        const delay = Math.max(20, Math.min(250, Math.round(fx.reverb.roomSize * 1.8 + fx.reverb.preDelay)));
+        const decay = Math.max(0.1, Math.min(0.7, (fx.reverb.decay / 150))).toFixed(2);
+        filters.push(`aecho=${inGain}:${outGain}:${delay}:${decay}`);
       }
 
       // Delay to timeline start position in milliseconds

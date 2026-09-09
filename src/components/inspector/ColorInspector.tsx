@@ -286,6 +286,23 @@ export const ColorInspector: React.FC<ColorInspectorProps> = ({ clip }) => {
             />
           </div>
 
+          {/* Brightness */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[11px] text-gray-400">
+              <span>Brightness</span>
+              <span className="font-mono text-gray-200">{(grade.basic.brightness || 0).toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min="-1"
+              max="1"
+              step="0.02"
+              value={grade.basic.brightness || 0}
+              onChange={e => handleBasicChange('brightness', Number(e.target.value))}
+              className="w-full accent-amber-400 h-1 bg-freecut-panel rounded cursor-pointer"
+            />
+          </div>
+
           {/* Contrast */}
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] text-gray-400">
@@ -401,6 +418,40 @@ export const ColorInspector: React.FC<ColorInspectorProps> = ({ clip }) => {
                 value={grade.basic.shadows}
                 onChange={e => handleBasicChange('shadows', Number(e.target.value))}
                 className="w-full accent-amber-400 h-1 bg-freecut-panel rounded"
+              />
+            </div>
+          </div>
+
+          {/* Whites / Blacks */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-gray-400">
+                <span>Whites</span>
+                <span className="font-mono">{grade.basic.whites.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.05"
+                value={grade.basic.whites}
+                onChange={e => handleBasicChange('whites', Number(e.target.value))}
+                className="w-full accent-amber-400 h-1 bg-freecut-panel rounded cursor-pointer"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-gray-400">
+                <span>Blacks</span>
+                <span className="font-mono">{grade.basic.blacks.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min="-1"
+                max="1"
+                step="0.05"
+                value={grade.basic.blacks}
+                onChange={e => handleBasicChange('blacks', Number(e.target.value))}
+                className="w-full accent-amber-400 h-1 bg-freecut-panel rounded cursor-pointer"
               />
             </div>
           </div>

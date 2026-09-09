@@ -98,10 +98,19 @@ export class GradingEngine {
       // ----------------------------------------------------
       // 1. BASIC GRADING: Exposure, Temp/Tint
       // ----------------------------------------------------
+      // Exposure multiplier: 2^exposure
       if (expMult !== 1.0) {
         r *= expMult;
         g *= expMult;
         b *= expMult;
+      }
+
+      // Brightness offset (-1.0 to 1.0)
+      const brightness = basic.brightness || 0;
+      if (brightness !== 0) {
+        r += brightness * 0.4;
+        g += brightness * 0.4;
+        b += brightness * 0.4;
       }
 
       if (basic.temperature !== 0 || basic.tint !== 0) {
@@ -114,16 +123,16 @@ export class GradingEngine {
       let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
       if (shad !== 0 || high !== 0 || whites !== 0 || blacks !== 0) {
-        const shadowFactor = Math.max(0, 1.0 - luma * 2.0); // peaks at 0, goes to 0 at 0.5
-        const highlightFactor = Math.max(0, (luma - 0.5) * 2.0); // 0 at 0.5, peaks at 1.0
-        const blackFactor = Math.max(0, 1.0 - luma * 5.0);
-        const whiteFactor = Math.max(0, (luma - 0.8) * 5.0);
+        const shadowFactor = Math.max(0, 1.0 - luma * 1.8);
+        const highlightFactor = Math.max(0, (luma - 0.45) * 1.8);
+        const blackFactor = Math.max(0, 1.0 - luma * 2.8);
+        const whiteFactor = Math.max(0, (luma - 0.6) * 2.8);
 
         const tonalShift =
-          shad * shadowFactor * 0.3 +
-          high * highlightFactor * 0.3 +
-          blacks * blackFactor * 0.25 +
-          whites * whiteFactor * 0.25;
+          shad * shadowFactor * 0.35 +
+          high * highlightFactor * 0.35 +
+          blacks * blackFactor * 0.30 +
+          whites * whiteFactor * 0.30;
 
         r += tonalShift;
         g += tonalShift;

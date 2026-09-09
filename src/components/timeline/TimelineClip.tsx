@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link2, Volume2, VolumeX, Trash2, Unlink } from 'lucide-react';
 import { ClipItem } from '../../types/project';
 import { useProjectStore } from '../../state/projectStore';
 import { formatDurationCompact } from '../../utils/timecode';
@@ -27,11 +28,27 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({ clip, height }) => {
   const [draggingKfId, setDraggingKfId] = useState<string | null>(null);
 
   const [waveformPeaks, setWaveformPeaks] = useState<{ min: number[]; max: number[] } | null>(null);
+  const [isDropHovered, setIsDropHovered] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const isAudio = clip.type === 'audio';
   const hasAudio = isAudio || clip.type === 'video';
 
   const left = clip.startTime * zoom;
   const width = Math.max(12, clip.duration * zoom);
+
+  useEffect(() => {
+    if (!menuPos) return;
+    const closeMenu = () => setMenuPos(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, [menuPos]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    store.selectClip(clip.id);
+    setMenuPos({ x: e.clientX, y: e.clientY });
+  };
 
   useEffect(() => {
     if (!hasAudio || !media) return;
@@ -240,10 +257,89 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({ clip, height }) => {
     }
   }
 
+  const handleClipDragOver = (e: React.DragEvent) => {
+    const types = e.dataTransfer.types;
+    if (types.includes('application/freecut-effect-type') || types.includes('application/freecut-transition-type') || types.includes('application/freecut-motion-preset')) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDropHovered(true);
+    }
+  };
+
+  const handleClipDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropHovered(false);
+  };
+
+  const handleClipDrop = (e: React.DragEvent) => {
+    setIsDropHovered(false);
+
+    const motionPreset = e.dataTransfer.getData('application/freecut-motion-preset');
+    if (motionPreset) {
+      e.preventDefault();
+      e.stopPropagation();
+      store.applyMotionPreset(clip.id, motionPreset as any);
+      store.selectClip(clip.id);
+      return;
+    }
+
+    const effectType = e.dataTransfer.getData('application/freecut-effect-type');
+    if (effectType) {
+      e.preventDefault();
+      e.stopPropagation();
+      store.addEffect(clip.id, effectType as any);
+      store.selectClip(clip.id);
+      store.setState({ statusMessage: `Applied effect "${effectType}" to clip "${clip.name}"` });
+      return;
+    }
+
+    const transitionType = e.dataTransfer.getData('application/freecut-transition-type');
+    if (transitionType) {
+      e.preventDefault();
+      e.stopPropagation();
+      const allClips = store.getState().project.clips;
+      const nextClip = allClips.find(
+        c => c.trackId === clip.trackId && Math.abs(c.startTime - (clip.startTime + clip.duration)) < 0.25
+      );
+      if (nextClip) {
+        store.addTransition(transitionType as any, clip.id, nextClip.id, 1.0);
+        store.setState({ statusMessage: `Applied ${transitionType} transition` });
+      } else {
+        const prevClip = allClips.find(
+          c => c.trackId === clip.trackId && Math.abs((c.startTime + c.duration) - clip.startTime) < 0.25
+        );
+        if (prevClip) {
+          store.addTransition(transitionType as any, prevClip.id, clip.id, 1.0);
+          store.setState({ statusMessage: `Applied ${transitionType} transition` });
+        }
+      }
+    }
+  };
+
+  const getTypeBadge = () => {
+    switch (clip.type) {
+      case 'text':
+        return <span className="px-1 py-0.2 bg-purple-600/90 text-white rounded text-[8px] font-bold shrink-0">TXT</span>;
+      case 'audio':
+        return <span className="px-1 py-0.2 bg-emerald-600/90 text-white rounded text-[8px] font-bold shrink-0">AUD</span>;
+      case 'image':
+        return <span className="px-1 py-0.2 bg-amber-600/90 text-white rounded text-[8px] font-bold shrink-0">IMG</span>;
+      case 'video':
+      default:
+        return <span className="px-1 py-0.2 bg-cyan-700/80 text-cyan-100 rounded text-[8px] font-bold shrink-0">VID</span>;
+    }
+  };
+
   return (
     <div
       onClick={handleSelect}
       onMouseDown={handleMouseDownMove}
+      onContextMenu={handleContextMenu}
+      onDragOver={handleClipDragOver}
+      onDragLeave={handleClipDragLeave}
+      onDrop={handleClipDrop}
       style={{
         left: `${left}px`,
         width: `${width}px`,
@@ -261,7 +357,9 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({ clip, height }) => {
           ? 'bg-gradient-to-r from-purple-900/95 to-indigo-800/95 border border-purple-500/70 text-purple-100 shadow-[0_0_8px_rgba(168,85,247,0.15)]'
           : 'bg-gradient-to-r from-cyan-900/90 to-blue-800/90 border border-cyan-500/60 text-cyan-100'
       } ${
-        isSelected
+        isDropHovered
+          ? 'ring-2 ring-violet-400 border-violet-400 bg-violet-600/40 z-30 shadow-[0_0_12px_rgba(167,139,250,0.6)]'
+          : isSelected
           ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-black z-20 shadow-lg'
           : 'hover:border-white/60 z-10'
       } ${isDragging || isTrimmingLeft || isTrimmingRight ? 'opacity-90' : ''}`}
@@ -325,16 +423,17 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({ clip, height }) => {
 
       {/* Clip Content & Title */}
       <div className="px-2 py-0.5 h-full flex flex-col justify-between overflow-hidden pointer-events-none">
-        <div className="flex items-center space-x-1 truncate">
-          {clip.type === 'text' && (
-            <span className="px-1 py-0.2 bg-purple-600/90 text-white rounded text-[8px] font-bold shrink-0">
-              TXT
+        <div className="flex items-center space-x-1.5 truncate">
+          {getTypeBadge()}
+          {clip.linkedClipId && (
+            <span title="Linked audio/video clip" className="text-amber-400 shrink-0 flex items-center">
+              <Link2 className="w-2.5 h-2.5" />
             </span>
           )}
-          <span className="text-[11px] font-medium truncate leading-tight">{clip.name}</span>
+          <span className="text-[11px] font-semibold truncate leading-tight text-white/95">{clip.name}</span>
           {clip.effects && clip.effects.length > 0 && (
             <span className="px-1 py-0.2 bg-violet-600 text-violet-100 rounded text-[8px] font-bold shrink-0">
-              fx
+              fx ({clip.effects.length})
             </span>
           )}
         </div>
@@ -343,6 +442,86 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({ clip, height }) => {
           {clip.sourceStart > 0 && <span>In: {clip.sourceStart.toFixed(1)}s</span>}
         </div>
       </div>
+
+      {/* Context Menu */}
+      {menuPos && (
+        <div
+          style={{ position: 'fixed', left: `${menuPos.x}px`, top: `${menuPos.y}px` }}
+          className="z-50 bg-freecut-darkest border border-freecut-border rounded shadow-2xl py-1 w-44 text-xs select-none pointer-events-auto"
+          onClick={e => e.stopPropagation()}
+        >
+          {clip.linkedClipId ? (
+            <button
+              onClick={() => {
+                store.unlinkClip(clip.id);
+                setMenuPos(null);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center space-x-2 text-amber-300"
+            >
+              <Unlink className="w-3.5 h-3.5" />
+              <span>Unlink Audio & Video</span>
+            </button>
+          ) : null}
+
+          {clip.linkedClipId && clip.type === 'video' && (
+            <button
+              onClick={() => {
+                const audioId = clip.linkedClipId;
+                store.unlinkClip(clip.id);
+                if (audioId) store.deleteClips([audioId]);
+                setMenuPos(null);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center space-x-2 text-red-300"
+            >
+              <VolumeX className="w-3.5 h-3.5" />
+              <span>Delete Audio Only</span>
+            </button>
+          )}
+
+          {clip.linkedClipId && clip.type === 'audio' && (
+            <button
+              onClick={() => {
+                const videoId = clip.linkedClipId;
+                store.unlinkClip(clip.id);
+                if (videoId) store.deleteClips([videoId]);
+                setMenuPos(null);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center space-x-2 text-red-300"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Video Only</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              store.executeProjectMutation('Toggle Mute', proj => {
+                const c = proj.clips.find(item => item.id === clip.id);
+                if (c) c.muted = !c.muted;
+                return proj;
+              });
+              setMenuPos(null);
+            }}
+            className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center space-x-2 text-gray-200"
+          >
+            {clip.muted ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span>{clip.muted ? 'Unmute Clip' : 'Mute Clip'}</span>
+          </button>
+
+          <div className="border-t border-freecut-border my-1" />
+
+          <button
+            onClick={() => {
+              store.deleteClips([clip.id]);
+              setMenuPos(null);
+            }}
+            className="w-full px-3 py-1.5 text-left hover:bg-red-500/20 flex items-center space-x-2 text-red-400"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Clip</span>
+          </button>
+        </div>
+      )}
 
       {/* Keyframe Markers Visualization (Shown on selected clips or clips with keyframes) */}
       {keyframeList.length > 0 && (

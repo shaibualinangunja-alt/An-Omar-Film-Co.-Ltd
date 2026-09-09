@@ -24,10 +24,11 @@ export class ColorCompiler {
     const basic = grade.basic;
     const wheels = grade.wheels;
 
-    // 1. Exposure, Contrast, Saturation via FFmpeg 'eq'
+    // 1. Exposure, Brightness, Contrast, Saturation via FFmpeg 'eq'
     const expFactor = Math.pow(2, basic.exposure);
-    // Approximate brightness shift from exposure and highlights/shadows
-    const brightness = (expFactor - 1.0) * 0.4 + basic.shadows * 0.08 + basic.highlights * 0.08 + basic.blacks * 0.05 + basic.whites * 0.05;
+    const userBrightness = basic.brightness || 0;
+    // Net brightness shift from exposure, explicit brightness, and tonal highlights/shadows/whites/blacks
+    const brightness = (expFactor - 1.0) * 0.35 + userBrightness * 0.4 + basic.shadows * 0.10 + basic.highlights * 0.10 + basic.blacks * 0.08 + basic.whites * 0.08;
     const contrast = basic.contrast;
     const saturation = Math.max(0, basic.saturation * (1.0 + basic.vibrance * 0.25));
 

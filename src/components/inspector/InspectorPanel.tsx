@@ -5,7 +5,6 @@ import {
   Maximize2, 
   RotateCw, 
   Eye, 
-  Volume2, 
   Film, 
   Info,
   ChevronLeft,
@@ -36,6 +35,7 @@ import { ChromaKeyInspector } from './ChromaKeyInspector';
 import { MaskInspector } from './MaskInspector';
 import { TrackingInspector } from './TrackingInspector';
 import { ColorInspector } from './ColorInspector';
+import { AudioInspector } from './AudioInspector';
 
 export const InspectorPanel: React.FC = () => {
   const [state, store] = useProjectStore();
@@ -151,12 +151,12 @@ export const InspectorPanel: React.FC = () => {
   if (!selectedClip) {
     return (
       <div className="h-full bg-freecut-darker border-l border-freecut-border p-4 flex flex-col items-center justify-center text-center select-none">
-        <div className="w-12 h-12 rounded-full bg-freecut-panel flex items-center justify-center text-gray-500 mb-3 border border-freecut-border">
+        <div className="w-12 h-12 rounded-full bg-freecut-panel flex items-center justify-center text-cyan-400 mb-3 border border-freecut-border shadow-md">
           <Sliders className="w-5 h-5" />
         </div>
-        <h3 className="text-xs font-semibold text-gray-300 mb-1">No Selection</h3>
-        <p className="text-[11px] text-gray-500 max-w-[180px] leading-relaxed">
-          Select a clip, caption, or transition on the timeline to edit parameters, effects, and animations.
+        <h3 className="text-xs font-bold text-gray-200 mb-1.5 uppercase tracking-wider">Inspector</h3>
+        <p className="text-[11px] text-gray-400 max-w-[200px] leading-relaxed">
+          Select a clip, text, caption, transition or effect to edit it.
         </p>
       </div>
     );
@@ -179,10 +179,6 @@ export const InspectorPanel: React.FC = () => {
 
   const handleTransformChange = (field: 'positionX' | 'positionY' | 'scale' | 'rotation' | 'opacity', value: number) => {
     store.updateClipTransform(selectedClip.id, { [field]: value });
-  };
-
-  const handleVolumeChange = (value: number) => {
-    store.updateClipVolume(selectedClip.id, value);
   };
 
   const renderKeyframeControl = (property: AnimatableProperty) => {
@@ -456,121 +452,7 @@ export const InspectorPanel: React.FC = () => {
 
         {/* Audio / Volume / Pan / Fades Controls */}
         {(selectedClip.type === 'audio' || selectedClip.type === 'video') && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
-              <div className="flex items-center space-x-1.5">
-                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Audio Engine</span>
-              </div>
-              <label className="flex items-center space-x-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={(selectedClip as any).audioEnabled !== false}
-                  onChange={e =>
-                    store.updateClipAudio(selectedClip.id, { audioEnabled: e.target.checked })
-                  }
-                  className="accent-emerald-400 rounded cursor-pointer"
-                />
-                <span className="text-[10px] text-gray-400">Audio On</span>
-              </label>
-            </div>
-
-            <div className="bg-freecut-darkest p-3 rounded border border-freecut-border space-y-3">
-              {/* Volume */}
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                  <span>Volume / Gain</span>
-                  <div className="flex items-center">
-                    <span className="font-mono text-gray-300 mr-1">
-                      {Math.round(evalState.volume * 100)}%
-                    </span>
-                    {renderKeyframeControl('volume')}
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.05"
-                  value={evalState.volume}
-                  onChange={e => handleVolumeChange(Number(e.target.value))}
-                  className="w-full accent-emerald-400 h-1 bg-freecut-panel rounded cursor-pointer"
-                />
-              </div>
-
-              {/* Pan / Balance */}
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                  <span>Stereo Pan</span>
-                  <span className="font-mono text-gray-300">
-                    {((selectedClip as any).pan ?? 0) === 0
-                      ? 'Center'
-                      : ((selectedClip as any).pan ?? 0) < 0
-                      ? `L ${Math.abs(Math.round(((selectedClip as any).pan ?? 0) * 100))}%`
-                      : `R ${Math.round(((selectedClip as any).pan ?? 0) * 100)}%`}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="-1"
-                  max="1"
-                  step="0.05"
-                  value={(selectedClip as any).pan ?? 0}
-                  onChange={e =>
-                    store.updateClipAudio(selectedClip.id, { pan: Number(e.target.value) })
-                  }
-                  className="w-full accent-teal-400 h-1 bg-freecut-panel rounded cursor-pointer"
-                />
-              </div>
-
-              {/* Fades */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div>
-                  <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                    <span>Fade In</span>
-                    <span className="font-mono">
-                      {((selectedClip as any).fadeInDuration ?? 0).toFixed(1)}s
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max={Math.min(5, selectedClip.duration)}
-                    step="0.1"
-                    value={(selectedClip as any).fadeInDuration ?? 0}
-                    onChange={e =>
-                      store.updateClipAudio(selectedClip.id, {
-                        fadeInDuration: Number(e.target.value),
-                      })
-                    }
-                    className="w-full accent-emerald-400 h-1 bg-freecut-panel rounded cursor-pointer"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                    <span>Fade Out</span>
-                    <span className="font-mono">
-                      {((selectedClip as any).fadeOutDuration ?? 0).toFixed(1)}s
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max={Math.min(5, selectedClip.duration)}
-                    step="0.1"
-                    value={(selectedClip as any).fadeOutDuration ?? 0}
-                    onChange={e =>
-                      store.updateClipAudio(selectedClip.id, {
-                        fadeOutDuration: Number(e.target.value),
-                      })
-                    }
-                    className="w-full accent-emerald-400 h-1 bg-freecut-panel rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
+          <AudioInspector clip={selectedClip} />
         )}
 
         {/* Color Grading & Management (Video & Image clips) */}

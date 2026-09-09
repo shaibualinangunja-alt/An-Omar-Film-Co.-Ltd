@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   Scissors, 
   Trash2, 
@@ -12,7 +12,9 @@ import {
   ArrowLeftToLine,
   Shuffle,
   Type,
-  Subtitles
+  Subtitles,
+  RotateCcw,
+  RotateCw
 } from 'lucide-react';
 import { useProjectStore } from '../../state/projectStore';
 import { TimeRuler } from './TimeRuler';
@@ -23,6 +25,14 @@ import { Playhead } from './Playhead';
 import { formatTimecode } from '../../utils/timecode';
 import { findSnapPoint } from '../../utils/timelineMath';
 import { TransitionRegistry } from '../../transitions';
+
+interface GhostPreview {
+  trackId: string;
+  startTime: number;
+  duration: number;
+  isCompatible: boolean;
+  mediaName: string;
+}
 
 const TimelineTimecodeDisplay: React.FC<{ fps?: number }> = ({ fps = 30 }) => {
   const [currentTime] = useProjectStore(s => s.currentTime);
@@ -38,17 +48,36 @@ export const TimelinePanel: React.FC = () => {
     project: s.project,
     selectedClipIds: s.selectedClipIds,
     selectedTransitionId: s.selectedTransitionId,
+    selectedCaptionTrackId: s.selectedCaptionTrackId,
     timelineZoom: s.timelineZoom,
     snappingEnabled: s.snappingEnabled,
     clipboard: s.clipboard,
+    draggedMedia: s.draggedMedia,
   }));
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const lanesContainerRef = useRef<HTMLDivElement>(null);
   const trackHeadersRef = useRef<HTMLDivElement>(null);
+  const [ghostPreview, setGhostPreview] = useState<GhostPreview | null>(null);
 
   const zoom = state.timelineZoom;
-  const tracks = state.project.tracks;
-  const captionTracks = state.project.captionTracks || [];
+  const rawTracks = state.project.tracks;
+
+  // Dynamic track revelation: T1, A3, A4 appear only when populated with clips
+  const tracks = rawTracks.filter(t => {
+    if (t.id === 'track_t1') {
+      return state.project.clips.some(c => c.trackId === t.id);
+    }
+    if (t.id === 'track_a3' || t.id === 'track_a4') {
+      return state.project.clips.some(c => c.trackId === t.id);
+    }
+    return true;
+  });
+
+  // Dynamic captions: C1 appears only when caption items exist or caption track is targeted
+  const captionTracks = (state.project.captionTracks || []).filter(
+    ct => (ct.items && ct.items.length > 0) || state.selectedCaptionTrackId === ct.id
+  );
+
   const totalCaptionsHeight = captionTracks.reduce((acc, t) => acc + (t.height || 36), 0);
   const totalTracksHeight = tracks.reduce((acc, t) => acc + t.height, 0) + totalCaptionsHeight;
 
@@ -74,18 +103,70 @@ export const TimelinePanel: React.FC = () => {
     }
   };
 
+  // Drag-and-drop onto lanes with smart track routing and auto-seeking
   const handleLanesDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+
+    const container = lanesContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    let targetTrack = tracks[0];
+    let currentY = 0;
+    for (const t of tracks) {
+      if (y >= currentY && y < currentY + t.height) {
+        targetTrack = t;
+        break;
+      }
+      currentY += t.height;
+    }
+
+    const draggedMedia = state.draggedMedia;
+    const isDirectlyCompatible = draggedMedia ? (
+      (draggedMedia.type === 'video' && targetTrack.type === 'video') ||
+      (draggedMedia.type === 'image' && targetTrack.type === 'video') ||
+      (draggedMedia.type === 'audio' && targetTrack.type === 'audio')
+    ) : true;
+
+    let targetTrackId = targetTrack.id;
+    if (draggedMedia && !isDirectlyCompatible) {
+      if (draggedMedia.type === 'audio') {
+        const firstAudio = tracks.find(t => t.type === 'audio');
+        if (firstAudio) targetTrackId = firstAudio.id;
+      } else {
+        const firstVideo = tracks.find(t => t.type === 'video');
+        if (firstVideo) targetTrackId = firstVideo.id;
+      }
+    }
+
+    let snappedX = x;
+    if (state.snappingEnabled) {
+      const time = x / zoom;
+      const snapTime = findSnapPoint(time, state.project.clips, store.getState().currentTime, undefined, 12 / zoom);
+      snappedX = snapTime * zoom;
+    }
+
+    setGhostPreview({
+      trackId: targetTrackId,
+      startTime: Math.max(0, snappedX / zoom),
+      duration: draggedMedia?.duration || 5,
+      isCompatible: isDirectlyCompatible,
+      mediaName: draggedMedia?.name || 'Media Clip',
+    });
+  };
+
+  const handleLanesDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setGhostPreview(null);
   };
 
   const handleLanesDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const mediaId = e.dataTransfer.getData('application/freecut-media-id');
-    if (!mediaId) return;
-
-    const media = state.project.media.find(m => m.id === mediaId);
-    if (!media) return;
+    setGhostPreview(null);
 
     const container = lanesContainerRef.current;
     if (!container) return;
@@ -93,6 +174,23 @@ export const TimelinePanel: React.FC = () => {
     const rect = container.getBoundingClientRect();
     const dropX = e.clientX - rect.left;
     const dropY = e.clientY - rect.top;
+
+    const overlayId = e.dataTransfer.getData('application/freecut-overlay-id');
+    if (overlayId) {
+      let dropTime = Math.max(0, dropX / zoom);
+      if (state.snappingEnabled) {
+        dropTime = findSnapPoint(dropTime, state.project.clips, store.getState().currentTime, undefined, 12 / zoom);
+      }
+      const videoTrack = tracks.find(t => t.type === 'video' && !t.locked) || tracks[0];
+      store.addOverlayToTimeline(overlayId, videoTrack.id, dropTime);
+      return;
+    }
+
+    const mediaId = e.dataTransfer.getData('application/freecut-media-id') || state.draggedMedia?.id;
+    if (!mediaId) return;
+
+    const media = state.project.media.find(m => m.id === mediaId);
+    if (!media) return;
 
     let targetTrack = tracks[0];
     let currentY = 0;
@@ -163,11 +261,11 @@ export const TimelinePanel: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-freecut-darkest border-t border-freecut-border select-none">
-      {/* Timeline Toolbar */}
+      {/* Timeline Contextual Toolbar */}
       <div className="h-9 px-3 bg-freecut-darker border-b border-freecut-border flex items-center justify-between text-xs">
         {/* Left Editing Tools */}
         <div className="flex items-center space-x-1.5">
-          {/* Split */}
+          {/* COMMON: Split */}
           <button
             title="Split Clip at Playhead (S)"
             onClick={() => store.splitClipAtPlayhead()}
@@ -177,9 +275,9 @@ export const TimelinePanel: React.FC = () => {
             <span>Split (S)</span>
           </button>
 
-          {/* Normal Delete */}
+          {/* COMMON: Delete */}
           <button
-            title="Delete Selected Clip(s) (Del) - Preserves Gaps"
+            title="Delete Selected Clip(s) (Del) - Preserves gap"
             disabled={!hasSelection}
             onClick={() => store.deleteSelectedClips()}
             className="flex items-center space-x-1 px-2.5 py-1 bg-freecut-panel hover:bg-freecut-elevated text-gray-200 hover:text-red-400 rounded border border-freecut-border transition-colors text-[11px] disabled:opacity-40"
@@ -188,9 +286,9 @@ export const TimelinePanel: React.FC = () => {
             <span>Delete</span>
           </button>
 
-          {/* Ripple Delete */}
+          {/* COMMON: Ripple Delete */}
           <button
-            title="Ripple Delete Selected Clip(s) (Shift+Del) - Closes Gaps"
+            title="Ripple Delete Selected Clip(s) (Shift+Del) - Closes gap automatically"
             disabled={!hasSelection}
             onClick={() => store.rippleDeleteSelectedClips()}
             className="flex items-center space-x-1 px-2.5 py-1 bg-freecut-panel hover:bg-freecut-elevated text-gray-200 hover:text-cyan-400 rounded border border-freecut-border transition-colors text-[11px] disabled:opacity-40"
@@ -199,9 +297,51 @@ export const TimelinePanel: React.FC = () => {
             <span>Ripple Del</span>
           </button>
 
-          {/* Add Transition */}
+          {/* Undo / Redo */}
+          <div className="flex items-center space-x-0.5 border-l border-freecut-border pl-1.5">
+            <button
+              title="Undo (Ctrl+Z)"
+              disabled={!store.canUndo()}
+              onClick={() => store.undo()}
+              className="p-1 rounded hover:bg-freecut-panel text-gray-400 hover:text-gray-200 disabled:opacity-30"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              title="Redo (Ctrl+Shift+Z)"
+              disabled={!store.canRedo()}
+              onClick={() => store.redo()}
+              className="p-1 rounded hover:bg-freecut-panel text-gray-400 hover:text-gray-200 disabled:opacity-30"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="h-4 w-[1px] bg-freecut-border mx-1" />
+
+          {/* ADD: Add Text */}
           <button
-            title="Add Transition between Adjacent Clips"
+            title="Add Text Title at Playhead (T)"
+            onClick={() => store.addTextClip()}
+            className="flex items-center space-x-1 px-2.5 py-1 bg-purple-950/50 hover:bg-purple-900/70 text-purple-200 hover:text-purple-100 rounded border border-purple-600/60 transition-colors text-[11px]"
+          >
+            <Type className="w-3.5 h-3.5 text-purple-400" />
+            <span>Add Text</span>
+          </button>
+
+          {/* ADD: Add Caption */}
+          <button
+            title="Add Subtitle Caption at Playhead (C)"
+            onClick={() => store.addCaptionItem()}
+            className="flex items-center space-x-1 px-2.5 py-1 bg-blue-950/50 hover:bg-blue-900/70 text-blue-200 hover:text-blue-100 rounded border border-blue-600/60 transition-colors text-[11px]"
+          >
+            <Subtitles className="w-3.5 h-3.5 text-blue-400" />
+            <span>Add Caption</span>
+          </button>
+
+          {/* ADD: Transition */}
+          <button
+            title={canAddTransition ? 'Add Transition between selected adjacent clips' : 'Select two adjacent clips to add a transition'}
             disabled={!canAddTransition}
             onClick={handleAddTransition}
             className="flex items-center space-x-1 px-2.5 py-1 bg-freecut-panel hover:bg-freecut-elevated text-gray-200 hover:text-amber-400 rounded border border-freecut-border transition-colors text-[11px] disabled:opacity-40"
@@ -210,29 +350,9 @@ export const TimelinePanel: React.FC = () => {
             <span>Transition</span>
           </button>
 
-          {/* Add Text */}
-          <button
-            title="Add Text Element at Playhead (T)"
-            onClick={() => store.addTextClip()}
-            className="flex items-center space-x-1 px-2.5 py-1 bg-purple-950/50 hover:bg-purple-900/70 text-purple-200 hover:text-purple-100 rounded border border-purple-600/60 transition-colors text-[11px]"
-          >
-            <Type className="w-3.5 h-3.5 text-purple-400" />
-            <span>Add Text</span>
-          </button>
-
-          {/* Add Caption */}
-          <button
-            title="Add Caption at Playhead (C)"
-            onClick={() => store.addCaptionItem()}
-            className="flex items-center space-x-1 px-2.5 py-1 bg-blue-950/50 hover:bg-blue-900/70 text-blue-200 hover:text-blue-100 rounded border border-blue-600/60 transition-colors text-[11px]"
-          >
-            <Subtitles className="w-3.5 h-3.5 text-blue-400" />
-            <span>Add Caption</span>
-          </button>
-
           <div className="h-4 w-[1px] bg-freecut-border mx-1" />
 
-          {/* Duplicate */}
+          {/* CLIP TOOLS: Duplicate */}
           <button
             title="Duplicate Selected Clip(s) (Ctrl+D)"
             disabled={!hasSelection}
@@ -242,7 +362,7 @@ export const TimelinePanel: React.FC = () => {
             <CopyPlus className="w-3.5 h-3.5" />
           </button>
 
-          {/* Copy */}
+          {/* CLIP TOOLS: Copy */}
           <button
             title="Copy Selected Clip(s) (Ctrl+C)"
             disabled={!hasSelection}
@@ -252,7 +372,7 @@ export const TimelinePanel: React.FC = () => {
             <Copy className="w-3.5 h-3.5" />
           </button>
 
-          {/* Paste */}
+          {/* CLIP TOOLS: Paste */}
           <button
             title="Paste Copied Clip(s) at Playhead (Ctrl+V)"
             disabled={state.clipboard.length === 0}
@@ -266,7 +386,7 @@ export const TimelinePanel: React.FC = () => {
 
           {/* Snapping Toggle */}
           <button
-            title={`Snapping: ${state.snappingEnabled ? 'Enabled' : 'Disabled'}`}
+            title={`Magnetic Snapping: ${state.snappingEnabled ? 'Enabled (Snaps to cutpoints and playhead)' : 'Disabled'}`}
             onClick={() => store.toggleSnapping()}
             className={`p-1.5 rounded transition-colors ${
               state.snappingEnabled
@@ -292,7 +412,7 @@ export const TimelinePanel: React.FC = () => {
         {/* Right: Zoom Controls */}
         <div className="flex items-center space-x-2">
           <button
-            title="Zoom Out"
+            title="Zoom Out Timeline"
             onClick={() => store.setTimelineZoom(zoom - 10)}
             className="p-1 text-gray-400 hover:text-gray-200"
           >
@@ -304,12 +424,13 @@ export const TimelinePanel: React.FC = () => {
             min="10"
             max="150"
             value={zoom}
+            title="Timeline Zoom Level"
             onChange={e => store.setTimelineZoom(Number(e.target.value))}
             className="w-24 accent-cyan-400 h-1 bg-freecut-panel rounded cursor-pointer"
           />
 
           <button
-            title="Zoom In"
+            title="Zoom In Timeline"
             onClick={() => store.setTimelineZoom(zoom + 10)}
             className="p-1 text-gray-400 hover:text-gray-200"
           >
@@ -349,14 +470,26 @@ export const TimelinePanel: React.FC = () => {
             {/* Time Ruler */}
             <TimeRuler totalDuration={totalDuration} />
 
-            {/* Track Lanes with Drag-and-Drop Dropzone */}
+            {/* Track Lanes with Drag-and-Drop Dropzone & Ghost Box */}
             <div
               ref={lanesContainerRef}
               onDragOver={handleLanesDragOver}
+              onDragLeave={handleLanesDragLeave}
               onDrop={handleLanesDrop}
               className="relative"
               style={{ height: `${totalTracksHeight}px` }}
             >
+              {/* Empty Timeline Guidance Message */}
+              {state.project.clips.length === 0 && captionTracks.flatMap(t => t.items).length === 0 && !ghostPreview && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 text-gray-500">
+                  <div className="flex items-center space-x-2 text-xs font-medium text-gray-400 bg-freecut-panel/90 border border-freecut-border px-4 py-2 rounded-full shadow-xl">
+                    <span>Drag videos, photos or audio here from the library</span>
+                    <span className="text-gray-600">•</span>
+                    <span>or use Add Text / Add Caption above</span>
+                  </div>
+                </div>
+              )}
+
               {tracks.map(track => {
                 const trackClips = state.project.clips.filter(c => c.trackId === track.id);
                 return (
@@ -369,6 +502,33 @@ export const TimelinePanel: React.FC = () => {
                   >
                     {/* Subtle lane background grid */}
                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+
+                    {/* Live Drag Ghost Preview Box */}
+                    {ghostPreview && ghostPreview.trackId === track.id && (
+                      <div
+                        style={{
+                          left: `${ghostPreview.startTime * zoom}px`,
+                          width: `${Math.max(20, ghostPreview.duration * zoom)}px`,
+                          top: '2px',
+                          bottom: '2px',
+                        }}
+                        className={`absolute z-30 rounded border-2 border-dashed pointer-events-none flex flex-col justify-between p-1.5 backdrop-blur-xs transition-all animate-pulse ${
+                          ghostPreview.isCompatible
+                            ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                            : 'bg-amber-500/25 border-amber-400 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px] font-bold">
+                          <span className="truncate">{ghostPreview.mediaName}</span>
+                          <span className="text-[9px] font-normal px-1 py-0.2 rounded bg-black/50">
+                            {ghostPreview.isCompatible ? '✓ Compatible' : '⇄ Auto-routed'}
+                          </span>
+                        </div>
+                        <div className="text-[9px] font-mono text-gray-300">
+                          {formatTimecode(ghostPreview.startTime, state.project.project.fps || 30)}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Clips positioned on this track */}
                     {trackClips.map(clip => (

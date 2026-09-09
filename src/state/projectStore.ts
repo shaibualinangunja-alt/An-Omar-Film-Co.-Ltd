@@ -26,6 +26,8 @@ import {
   EffectInstance,
   EffectRegistry,
   generateEffectId,
+  MotionPresetId,
+  getMotionPreset,
 } from '../effects';
 import {
   TextStyle,
@@ -51,6 +53,7 @@ import {
   TrackingData,
   TrackingService,
   DEFAULT_CHROMA_KEY_SETTINGS,
+  getOverlayPreset,
 } from '../compositing';
 import { ClipAudioSettings } from '../audio/types';
 import {
@@ -82,6 +85,9 @@ export interface EditorState {
   timelineZoom: number; // px per second
   snappingEnabled: boolean;
   activeMediaTab: 'all' | 'video' | 'audio' | 'image';
+  activeSidebarTab: 'media' | 'audio' | 'text' | 'captions' | 'effects' | 'overlays' | 'transitions' | 'color' | 'ai';
+  previewMediaId: string | null;
+  draggedMedia: MediaAsset | null;
   isExportModalOpen: boolean;
   isProjectSettingsOpen: boolean;
   isMediaEngineModalOpen: boolean;
@@ -115,6 +121,9 @@ class ProjectStore {
       timelineZoom: 45,
       snappingEnabled: true,
       activeMediaTab: 'all',
+      activeSidebarTab: 'media',
+      previewMediaId: null,
+      draggedMedia: null,
       isExportModalOpen: false,
       isProjectSettingsOpen: false,
       isMediaEngineModalOpen: false,
@@ -122,6 +131,10 @@ class ProjectStore {
       isRelinkModalOpen: false,
       statusMessage: 'Ready',
     };
+  }
+
+  setActiveSidebarTab(tab: EditorState['activeSidebarTab']) {
+    this.setState({ activeSidebarTab: tab });
   }
 
   getState(): EditorState {
@@ -516,11 +529,17 @@ class ProjectStore {
 
     const fps = this.state.project.project.fps || 30;
     const duration = snapToFrame(media.duration || 5, fps);
+    const snappedStart = snapToFrame(Math.max(0, startTime), fps);
+    const hasAudio = (media.audioChannels && media.audioChannels > 0) || (media.type === 'video' && media.codec && !media.codec.includes('png') && !media.codec.includes('jpeg'));
+
+    const isVideoWithAudio = media.type === 'video' && hasAudio;
+    const clipId = TimelineOperations.generateClipId();
+
     const newClip: ClipItem = {
-      id: TimelineOperations.generateClipId(),
+      id: clipId,
       mediaId,
       trackId,
-      startTime: snapToFrame(Math.max(0, startTime), fps),
+      startTime: snappedStart,
       duration,
       sourceStart: 0,
       sourceDuration: duration,
@@ -534,11 +553,44 @@ class ProjectStore {
         opacity: 1,
       },
       volume: 1.0,
-      muted: false,
+      muted: isVideoWithAudio ? true : false,
+      audioEnabled: !isVideoWithAudio,
     };
+
+    let audioClip: ClipItem | null = null;
+    if (isVideoWithAudio) {
+      const audioTrack = this.state.project.tracks.find(t => t.type === 'audio' && !t.locked) || { id: 'track_a1' };
+      const audioClipId = TimelineOperations.generateClipId();
+      audioClip = {
+        id: audioClipId,
+        mediaId,
+        trackId: audioTrack.id,
+        startTime: snappedStart,
+        duration,
+        sourceStart: 0,
+        sourceDuration: duration,
+        type: 'audio',
+        name: `${media.name} (Audio)`,
+        transform: {
+          positionX: 0,
+          positionY: 0,
+          scale: 1,
+          rotation: 0,
+          opacity: 1,
+        },
+        volume: 1.0,
+        muted: false,
+        audioEnabled: true,
+        linkedClipId: clipId,
+      };
+      newClip.linkedClipId = audioClipId;
+    }
 
     this.executeProjectMutation(`Add Clip: ${media.name}`, proj => {
       proj.clips.push(newClip);
+      if (audioClip) {
+        proj.clips.push(audioClip);
+      }
       return proj;
     });
 
@@ -556,16 +608,25 @@ class ProjectStore {
     const proj = this.state.project;
     const fps = proj.project.fps || 30;
 
+    let shouldAddTrack = false;
     let targetTrack = trackId ? proj.tracks.find(t => t.id === trackId && !t.locked) : undefined;
     if (!targetTrack) {
-      targetTrack = proj.tracks.find(t => t.type === 'video' && t.targeted && !t.locked);
+      targetTrack = proj.tracks.find(t => t.id === 'track_t1' && !t.locked);
     }
     if (!targetTrack) {
-      targetTrack = proj.tracks.find(t => t.type === 'video' && !t.locked);
-    }
-    if (!targetTrack) {
-      this.setState({ statusMessage: 'Cannot add text: No unlocked video track available' });
-      return;
+      targetTrack = {
+        id: 'track_t1',
+        name: 'Text 1 (T1)',
+        type: 'video',
+        order: 1.5,
+        muted: false,
+        locked: false,
+        solo: false,
+        visible: true,
+        targeted: true,
+        height: 44,
+      };
+      shouldAddTrack = true;
     }
 
     const start = snapToFrame(startTime !== undefined ? Math.max(0, startTime) : this.state.currentTime, fps);
@@ -594,11 +655,74 @@ class ProjectStore {
     };
 
     this.executeProjectMutation(`Add Text: ${newClip.name}`, p => {
+      if (shouldAddTrack && !p.tracks.some(t => t.id === 'track_t1')) {
+        p.tracks.push(targetTrack!);
+        p.tracks.sort((a, b) => a.order - b.order);
+      }
       p.clips.push(newClip);
       return p;
     });
 
     this.selectClip(newClip.id);
+  }
+
+  addOverlayToTimeline(
+    overlayId: string,
+    targetTrackId?: string,
+    startTime?: number,
+    duration: number = 5
+  ) {
+    const proj = this.state.project;
+    const fps = proj.project.fps || 30;
+    const preset = getOverlayPreset(overlayId);
+    if (!preset) return;
+
+    // Prefer upper track (track_v2 or track_v3) so overlay sits on top of V1
+    let targetTrack = targetTrackId ? proj.tracks.find(t => t.id === targetTrackId && !t.locked) : undefined;
+    if (!targetTrack) {
+      targetTrack = proj.tracks.find(t => t.id === 'track_v2' && !t.locked) ||
+                    proj.tracks.find(t => t.type === 'video' && t.order === 0 && !t.locked) ||
+                    proj.tracks.find(t => t.type === 'video' && !t.locked);
+    }
+
+    if (!targetTrack) {
+      this.setState({ statusMessage: 'Cannot add overlay: No unlocked video track available' });
+      return;
+    }
+
+    const start = snapToFrame(startTime !== undefined ? Math.max(0, startTime) : this.state.currentTime, fps);
+    const dur = snapToFrame(duration, fps);
+
+    const newClip: ClipItem = {
+      id: TimelineOperations.generateClipId(),
+      mediaId: '',
+      trackId: targetTrack.id,
+      startTime: start,
+      duration: dur,
+      sourceStart: 0,
+      sourceDuration: dur,
+      type: 'overlay',
+      overlayId: preset.id,
+      name: `${preset.name} Overlay`,
+      blendMode: preset.defaultBlendMode,
+      transform: {
+        positionX: 0,
+        positionY: 0,
+        scale: 1,
+        rotation: 0,
+        opacity: preset.defaultOpacity,
+      },
+      volume: 0,
+      muted: true,
+    };
+
+    this.executeProjectMutation(`Add Overlay: ${preset.name}`, p => {
+      p.clips.push(newClip);
+      return p;
+    });
+
+    this.selectClip(newClip.id);
+    this.setState({ statusMessage: `Added ${preset.name} overlay to ${targetTrack.name}` });
   }
 
   updateTextConfig(clipId: string, updates: Partial<TextConfig> | ((prev: TextConfig) => TextConfig)) {
@@ -773,6 +897,18 @@ class ProjectStore {
     this.deleteSelectedClips();
   }
 
+  deleteClips(clipIds: string[]) {
+    if (!clipIds || clipIds.length === 0) return;
+    this.executeProjectMutation(`Delete ${clipIds.length} Clip(s)`, proj => {
+      const res = TimelineOperations.deleteClips(proj, clipIds);
+      return res.project;
+    });
+    this.setState({
+      selectedClipIds: this.state.selectedClipIds.filter(id => !clipIds.includes(id)),
+      selectedClipId: clipIds.includes(this.state.selectedClipId || '') ? null : this.state.selectedClipId,
+    });
+  }
+
   rippleDeleteSelectedClips() {
     const ids = this.state.selectedClipIds;
     if (ids.length === 0) return;
@@ -808,10 +944,44 @@ class ProjectStore {
   }
 
   moveClips(clipIds: string[], deltaTime: number) {
+    const allMovingIds = new Set(clipIds);
+    for (const id of clipIds) {
+      const clip = this.state.project.clips.find(c => c.id === id);
+      if (clip?.linkedClipId) {
+        allMovingIds.add(clip.linkedClipId);
+      }
+    }
+
     this.executeProjectMutation('Move Clips', proj => {
-      const res = TimelineOperations.moveClips(proj, clipIds, deltaTime);
+      const res = TimelineOperations.moveClips(proj, Array.from(allMovingIds), deltaTime);
       return res.project;
     });
+  }
+
+  unlinkClip(clipId: string) {
+    this.executeProjectMutation('Unlink Audio and Video', proj => {
+      const clip = proj.clips.find(c => c.id === clipId);
+      if (!clip || !clip.linkedClipId) return proj;
+      const linked = proj.clips.find(c => c.id === clip.linkedClipId);
+      clip.linkedClipId = undefined;
+      if (linked) {
+        linked.linkedClipId = undefined;
+      }
+      return proj;
+    });
+    this.setState({ statusMessage: 'Unlinked audio and video clips' });
+  }
+
+  linkClips(clipId1: string, clipId2: string) {
+    this.executeProjectMutation('Link Clips', proj => {
+      const c1 = proj.clips.find(c => c.id === clipId1);
+      const c2 = proj.clips.find(c => c.id === clipId2);
+      if (!c1 || !c2) return proj;
+      c1.linkedClipId = c2.id;
+      c2.linkedClipId = c1.id;
+      return proj;
+    });
+    this.setState({ statusMessage: 'Linked clips together' });
   }
 
   trimClip(clipId: string, newStartTime: number, newDuration: number, newSourceStart: number) {
@@ -1104,6 +1274,32 @@ class ProjectStore {
     if (next !== null) {
       this.setCurrentTime(snapToFrame(clip.startTime + next, fps));
     }
+  }
+
+  applyMotionPreset(clipId: string, presetId: MotionPresetId, intensity: number = 1.0) {
+    const clip = this.state.project.clips.find(c => c.id === clipId);
+    if (!clip) return;
+    const preset = getMotionPreset(presetId);
+    if (!preset) return;
+
+    const generated = preset.generateTracks(clip.duration, intensity);
+    this.executeProjectMutation(`Apply Motion Preset: ${preset.name}`, proj => {
+      const targetClip = proj.clips.find(c => c.id === clipId);
+      if (!targetClip) return proj;
+
+      if (!targetClip.animations) targetClip.animations = {};
+      for (const [prop, keyframes] of Object.entries(generated)) {
+        if (keyframes) {
+          targetClip.animations[prop as AnimatableProperty] = {
+            property: prop as AnimatableProperty,
+            keyframes,
+          };
+        }
+      }
+      return proj;
+    });
+
+    this.setState({ statusMessage: `Applied camera motion "${preset.name}" to ${clip.name}` });
   }
 
   // --- Transition Engine ---
@@ -1608,6 +1804,26 @@ class ProjectStore {
       if (settings.audioEnabled !== undefined) (clip as any).audioEnabled = settings.audioEnabled;
       if (settings.fadeInDuration !== undefined) (clip as any).fadeInDuration = settings.fadeInDuration;
       if (settings.fadeOutDuration !== undefined) (clip as any).fadeOutDuration = settings.fadeOutDuration;
+      return proj;
+    });
+  }
+
+  updateClip(clipId: string, updates: Partial<ClipItem>) {
+    this.executeProjectMutation('Update Clip', proj => {
+      const clip = proj.clips.find(c => c.id === clipId);
+      if (clip) {
+        Object.assign(clip, updates);
+      }
+      return proj;
+    });
+  }
+
+  toggleClipMute(clipId: string) {
+    this.executeProjectMutation('Toggle Clip Mute', proj => {
+      const clip = proj.clips.find(c => c.id === clipId);
+      if (clip) {
+        clip.muted = !clip.muted;
+      }
       return proj;
     });
   }

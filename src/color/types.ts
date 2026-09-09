@@ -83,18 +83,28 @@ export interface LUTSettings {
 
 export type QuickLookId =
   | 'none'
+  | 'natural'
   | 'clean'
+  | 'cinematic_warm'
+  | 'cinematic_cool'
+  | 'soft_film'
+  | 'moody_cinema'
+  | 'golden_hour'
+  | 'night_cinema'
+  | 'documentary'
+  | 'teal_orange'
+  | 'vintage_film'
+  // Legacy aliases
   | 'cinematic'
   | 'warm'
   | 'cool'
   | 'film'
   | 'high_contrast'
-  | 'soft'
-  | 'natural';
+  | 'soft';
 
 export interface QuickGradeSettings {
   lookId: QuickLookId;
-  intensity: number; // 0.0 to 1.0
+  intensity: number; // 0.0 to 1.0 (0% original, 50% intended look, 100% strongest)
   autoExposureApplied: boolean;
   autoWhiteBalanceApplied: boolean;
   autoContrastApplied: boolean;
@@ -102,6 +112,7 @@ export interface QuickGradeSettings {
 
 export interface BasicGradeSettings {
   exposure: number;   // -5.0 to +5.0 EV stops (0 = neutral)
+  brightness: number; // -1.0 to +1.0 (0 = neutral)
   contrast: number;   // 0.5 to 2.0 (1.0 = neutral)
   pivot: number;      // 0.0 to 1.0 (0.435 = neutral)
   temperature: number;// -100 to +100 (0 = neutral)
@@ -149,6 +160,7 @@ export const DEFAULT_COLOR_WHEELS: ColorWheels = {
 
 export const DEFAULT_BASIC_GRADE: BasicGradeSettings = {
   exposure: 0,
+  brightness: 0,
   contrast: 1.0,
   pivot: 0.435,
   temperature: 0,
